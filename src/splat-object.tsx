@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import SplatSortWorker from './splat-sort-worker?worker';
 import { fragmentShaderSource, vertexShaderSource } from './splat-shaders';
 import { useFrame, useThree } from '@react-three/fiber';
 
 const computeFocalLengths = (
-  width: number,
-  height: number,
-  fov: number,
-  aspect: number,
-  dpr: number
+    width: number,
+    height: number,
+    fov: number,
+    aspect: number,
+    dpr: number
 ) => {
   const fovRad = THREE.MathUtils.degToRad(fov);
   const fovXRad = 2 * Math.atan(Math.tan(fovRad / 2) * aspect);
@@ -18,16 +18,10 @@ const computeFocalLengths = (
   return new THREE.Vector2(fx, fy);
 };
 
-export function Splat({
-  url = 'https://antimatter15.com/splat-data/train.splat',
-  maxSplats = Infinity,
-}: {
+const Splat = forwardRef<THREE.Mesh, {
   url?: string;
   maxSplats?: number;
-}) {
-  // Allow direct access to the mesh
-  const ref = useRef<THREE.Mesh>(null);
-
+}>(({ url = 'https://antimatter15.com/splat-data/train.splat', maxSplats = Infinity }, ref) => {
   // Web worker doing the splat sorting
   const [worker] = useState(() => new SplatSortWorker());
 
@@ -54,6 +48,13 @@ export function Splat({
     uniforms.viewport.value = new THREE.Vector2(width * dpr, height * dpr);
   }, [width, height, fov, aspect, dpr]);
 
+  // // Allow direct access to the mesh
+  // useEffect(() => {
+  //   if (ref) {
+  //     (ref as any).current = worker;
+  //   }
+  // }, [worker, ref]);
+
   // Initialize attribute buffers
   const [buffers, setBuffers] = useState({
     index: new Uint16Array([0, 1, 2, 2, 3, 0]),
@@ -66,15 +67,16 @@ export function Splat({
 
   // Send current camera pose to splat sorting worker
   useFrame((state, _delta, _xrFrame) => {
+
     const mesh = ref.current;
     if (mesh == null) {
       return;
     }
     const camera = state.camera;
     const viewProj = new THREE.Matrix4()
-      .multiply(camera.projectionMatrix)
-      .multiply(camera.matrixWorldInverse)
-      .multiply(mesh.matrixWorld);
+        .multiply(camera.projectionMatrix)
+        .multiply(camera.matrixWorldInverse)
+        .multiply(mesh.matrixWorld);
     worker.postMessage({ view: viewProj.elements, maxSplats });
   });
 
@@ -100,17 +102,17 @@ export function Splat({
         credentials: 'omit',
       });
       if (
-        req.status != 200 ||
-        req.body == null ||
-        req.headers == null ||
-        req.headers.get('content-length') == null
+          req.status != 200 ||
+          req.body == null ||
+          req.headers == null ||
+          req.headers.get('content-length') == null
       ) {
         throw new Error(req.status + ' Unable to load ' + req.url);
       }
       const rowLength = 3 * 4 + 3 * 4 + 4 + 4;
       const reader = req.body.getReader();
       let splatData = new Uint8Array(
-        parseInt(req.headers.get('content-length')!)
+          parseInt(req.headers.get('content-length')!)
       );
       let vertexCount = 0;
       let lastVertexCount = -1;
@@ -144,72 +146,74 @@ export function Splat({
 
   // Signal to Three that attributes change when their buffer change
   const update = useCallback(
-    (self: THREE.InstancedBufferAttribute | THREE.BufferAttribute) => {
-      self.needsUpdate = true;
-    },
-    []
+      (self: THREE.InstancedBufferAttribute | THREE.BufferAttribute) => {
+        self.needsUpdate = true;
+      },
+      []
   );
 
   // Count number of instances to feed where needed
   const instanceCount = Math.min(buffers.quat.length / 4, maxSplats);
 
   return (
-    <mesh ref={ref} renderOrder={10} rotation={[Math.PI, 0, 0]}>
-      <instancedBufferGeometry
-        key={instanceCount}
-        instanceCount={instanceCount}
-      >
-        <bufferAttribute
-          attach="index"
-          onUpdate={update}
-          array={buffers.index}
-          itemSize={1}
-          count={6}
+      <mesh ref={ref} renderOrder={10} rotation={[Math.PI, 0, 0]}>
+        <instancedBufferGeometry
+            key={instanceCount}
+            instanceCount={instanceCount}
+        >
+          <bufferAttribute
+              attach="index"
+              onUpdate={update}
+              array={buffers.index}
+              itemSize={1}
+              count={6}
+          />
+          <bufferAttribute
+              attach="attributes-position"
+              onUpdate={update}
+              array={buffers.position}
+              itemSize={3}
+              count={4}
+          />
+          <instancedBufferAttribute
+              attach="attributes-color"
+              onUpdate={update}
+              array={buffers.color}
+              itemSize={4}
+              count={instanceCount}
+          />
+          <instancedBufferAttribute
+              attach="attributes-quat"
+              onUpdate={update}
+              array={buffers.quat}
+              itemSize={4}
+              count={instanceCount}
+          />
+          <instancedBufferAttribute
+              attach="attributes-scale"
+              onUpdate={update}
+              array={buffers.scale}
+              itemSize={3}
+              count={instanceCount}
+          />
+          <instancedBufferAttribute
+              attach="attributes-center"
+              onUpdate={update}
+              array={buffers.center}
+              itemSize={3}
+              count={instanceCount}
+          />
+        </instancedBufferGeometry>
+        <rawShaderMaterial
+            uniforms={uniforms}
+            fragmentShader={fragmentShaderSource}
+            vertexShader={vertexShaderSource}
+            depthTest={true}
+            depthWrite={false}
+            transparent={true}
         />
-        <bufferAttribute
-          attach="attributes-position"
-          onUpdate={update}
-          array={buffers.position}
-          itemSize={3}
-          count={4}
-        />
-        <instancedBufferAttribute
-          attach="attributes-color"
-          onUpdate={update}
-          array={buffers.color}
-          itemSize={4}
-          count={instanceCount}
-        />
-        <instancedBufferAttribute
-          attach="attributes-quat"
-          onUpdate={update}
-          array={buffers.quat}
-          itemSize={4}
-          count={instanceCount}
-        />
-        <instancedBufferAttribute
-          attach="attributes-scale"
-          onUpdate={update}
-          array={buffers.scale}
-          itemSize={3}
-          count={instanceCount}
-        />
-        <instancedBufferAttribute
-          attach="attributes-center"
-          onUpdate={update}
-          array={buffers.center}
-          itemSize={3}
-          count={instanceCount}
-        />
-      </instancedBufferGeometry>
-      <rawShaderMaterial
-        uniforms={uniforms}
-        fragmentShader={fragmentShaderSource}
-        vertexShader={vertexShaderSource}
-        depthTest={true}
-        depthWrite={false}
-        transparent={true}
-      />
-    </mesh>
+      </mesh>
   );
-}
+});
+
+export default Splat;

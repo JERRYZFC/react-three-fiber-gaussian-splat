@@ -7,10 +7,10 @@ import {
 } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { Box } from './box';
-import { Splat } from './splat-object';
+import  Splat  from './splat-object';
 import { OrbitingSuzi } from './suzi';
 import { Leva, useControls } from 'leva';
-import { Suspense, useState } from 'react';
+import {Suspense, useRef, useState} from 'react';
 
 // import telco from "./telco.gltf";
 
@@ -62,6 +62,7 @@ const splatUrls = [
   // telco14k,
   // telco7k,
   // model30k,
+    '/model/nike.splat',
 
   'https://antimatter15.com/splat-data/train.splat',
   'https://antimatter15.com/splat-data/plush.splat',
@@ -92,6 +93,9 @@ function App() {
 
   // Performance factor
   const [factor, setFactor] = useState(1);
+
+  const spRef=useRef();
+  window.sp=spRef;
 
   // Downsample pixels if perf gets bad
   // const [dpr, setDpr] = useState(maxDpr);
@@ -157,9 +161,9 @@ function App() {
         </Suspense>}
 
         {splatUrl && <group position={splatPos} rotation={splatRot} scale={[splatScale, splatScale, splatScale]} >
-          <Splat url={splatUrl} maxSplats={effectiveSplats} />
+          <Splat url={splatUrl} maxSplats={effectiveSplats} ref={spRef} />
         </group>}
-        <Environment preset="city" />
+        {/*<Environment preset="city" />*/}
       </Canvas>
       <div className="absolute bottom-0 left-0 rounded-lg bg-white shadow border-gray-200 bg-white p-2 m-4">
         {factor < 1.0 && (throttleSplats || throttleDpr) ? (
